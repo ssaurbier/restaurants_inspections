@@ -24,9 +24,12 @@ class Matcher:
         self.df = df
 
     def find_best_match(self, user_input):
-        _, _, idx = process.extractOne(user_input.lower(), self.df['combined'])
-        best_match_row = self.df.iloc[idx]
-        return best_match_row
+        result = process.extractOne(user_input.lower(), self.df['combined'])
+        if result:
+            _, _, idx = result
+            best_match_row = self.df.iloc[idx]
+            return best_match_row
+        return None
 
 class GradeCalculator:
     @staticmethod
