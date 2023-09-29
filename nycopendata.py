@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from fuzzywuzzy import process
+from fuzzywuzzy import fuzz
 import requests
 import io
 
@@ -11,7 +11,6 @@ def load_data(url):
     df = pd.read_csv(data)
     df['dba'] = df['dba'].astype(str)
     df['inspection_date'] = pd.to_datetime(df['inspection_date'])
-    df['concatenated'] = df.apply(lambda row: ' '.join(row.astype(str).values), axis=1)
     return df.sort_values(by='inspection_date', ascending=False)
 
 class Matcher:
@@ -19,9 +18,12 @@ class Matcher:
         self.df = df
 
     def find_best_match(self, user_input):
-        choices = self.df['concatenated'].values
-        best_match, best_match_score = process.extractOne(user_input, choices)
-        best_match_row = self.df[self.df['concatenated'] == best_match].iloc[0]
+        best_match_row, best_match_score = None, 0
+        for index, row in self.df.iterrows():
+            row_values = ' '.join(row.astype(str).values)
+            match_score = fuzz.partial_ratio(user_input.lower(), row_values.lower())
+            if match_score > best_match_score:
+                best_match_score, best_match_row = match_score, row
         return best_match_row
 
 class GradeCalculator:
@@ -40,7 +42,7 @@ class DisplayHandler:
         self.df = df
 
     def display_overview(self):
-        overview_info = self.best_match_row[['dba', 'score', 'boro', 'street', 'zipcode', 'inspection_date', 'cuisine_description']].copy()
+        overview_info = self.best_match_row[['dba', 'score', 'boro', 'street', 'zipcode', 'inspection_date', 'cuisine_description']]
         overview_info['inspection_date'] = overview_info['inspection_date'].strftime('%Y-%m-%d')
         overview_info['street'] = overview_info['street'].lower()
         overview_info['score'] = int(overview_info['score'])
@@ -56,7 +58,7 @@ class DisplayHandler:
         return col2
 
     def display_images(self, col):
-        self._check_and_display_images(self.best_match_row, col)
+        self._check_and_display_images(self.best_match_row, self.df, col)
 
     def display_violations(self):
         camis_value, inspection_date = self.best_match_row['camis'], self.best_match_row['inspection_date']
@@ -75,11 +77,14 @@ class DisplayHandler:
                 st.write(violation)
 
     @staticmethod
-    def _check_and_display_images(best_match_row, col):
-        violation_descriptions = best_match_row['violation_description'].str.lower()
-        if "evidence of rats" in violation_descriptions:
+    def _check_and_display_images(best_match_row, df, col):
+        camis_value, inspection_date = best_match_row['camis'], best_match_row['inspection_date']
+        matching_rows = df[(df['camis'] == camis_value) & (df['inspection_date'] == inspection_date)]
+        violation_descriptions = matching_rows['violation_description'].str.lower()
+
+        if any("evidence of rats" in description for description in violation_descriptions):
             col.image('https://media.istockphoto.com/id/165655302/vector/rat-cartoon-thumbs-up.jpg?s=612x612&w=0&k=20&c=cHqlmywrwiSuO96Vl7gqGMoULsg2ETwnPqU91-FIg14=', caption='Evidence of Rats')
-        if "evidence of mice" in violation_descriptions:
+        if any("evidence of mice" in description for description in violation_descriptions):
             col.image('https://www.freethink.com/wp-content/uploads/2023/03/mice-with-two-dads-thumb.jpg?w=640', caption='Evidence of Mice')
 
 def main():
@@ -107,3 +112,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
