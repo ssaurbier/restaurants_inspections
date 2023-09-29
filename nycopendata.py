@@ -4,19 +4,14 @@ from fuzzywuzzy import fuzz
 import requests
 import io
 
-class DataLoader:
-    def __init__(self, url):
-        self.url = url
-
-    def load(self):
-        response = requests.get(self.url)
-        #response.raise_for_status()  # check if the req was successful
-        data = io.StringIO(response.text)
-        df = pd.read_csv(data)
-        print(df.columns)
-        df['dba'] = df['dba'].astype(str)
-        df['inspection_date'] = pd.to_datetime(df['inspection_date'])
-        return df.sort_values(by='inspection_date', ascending=False)
+@st.cache
+def load_data(url):
+    response = requests.get(url)
+    data = io.StringIO(response.text)
+    df = pd.read_csv(data)
+    df['dba'] = df['dba'].astype(str)
+    df['inspection_date'] = pd.to_datetime(df['inspection_date'])
+    return df.sort_values(by='inspection_date', ascending=False)
 
 class Matcher:
     def __init__(self, df):
@@ -102,8 +97,7 @@ def main():
     if search_button:
         if user_input:
             with st.spinner("Fetching data..."):
-                data_loader = DataLoader('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
-                df = data_loader.load()
+                df = load_data('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
             matcher = Matcher(df)  
             best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
