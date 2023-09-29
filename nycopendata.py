@@ -4,11 +4,6 @@ from fuzzywuzzy import process
 import requests
 import io
 
-# Create an additional function to pre-process data.
-def preprocess_data(df):
-    df['combined'] = df.apply(lambda row: ' '.join(row.astype(str).values), axis=1)
-    return df
-
 @st.cache_data
 def load_data(url):
     response = requests.get(url)
@@ -16,20 +11,18 @@ def load_data(url):
     df = pd.read_csv(data)
     df['dba'] = df['dba'].astype(str)
     df['inspection_date'] = pd.to_datetime(df['inspection_date'])
-    df = df.sort_values(by='inspection_date', ascending=False)
-    return preprocess_data(df)
+    df['concatenated'] = df.apply(lambda row: ' '.join(row.astype(str).values), axis=1)
+    return df.sort_values(by='inspection_date', ascending=False)
 
 class Matcher:
     def __init__(self, df):
         self.df = df
 
     def find_best_match(self, user_input):
-        result = process.extractOne(user_input.lower(), self.df['combined'])
-        if result:
-            _, _, idx = result
-            best_match_row = self.df.iloc[idx]
-            return best_match_row
-        return None
+        choices = self.df['concatenated'].values
+        best_match, best_match_score = process.extractOne(user_input, choices)
+        best_match_row = self.df[self.df['concatenated'] == best_match].iloc[0]
+        return best_match_row
 
 class GradeCalculator:
     @staticmethod
@@ -47,7 +40,7 @@ class DisplayHandler:
         self.df = df
 
     def display_overview(self):
-        overview_info = self.best_match_row[['dba', 'score', 'boro', 'street', 'zipcode', 'inspection_date', 'cuisine_description']]
+        overview_info = self.best_match_row[['dba', 'score', 'boro', 'street', 'zipcode', 'inspection_date', 'cuisine_description']].copy()
         overview_info['inspection_date'] = overview_info['inspection_date'].strftime('%Y-%m-%d')
         overview_info['street'] = overview_info['street'].lower()
         overview_info['score'] = int(overview_info['score'])
@@ -63,7 +56,7 @@ class DisplayHandler:
         return col2
 
     def display_images(self, col):
-        self._check_and_display_images(self.best_match_row, self.df, col)
+        self._check_and_display_images(self.best_match_row, col)
 
     def display_violations(self):
         camis_value, inspection_date = self.best_match_row['camis'], self.best_match_row['inspection_date']
@@ -82,14 +75,11 @@ class DisplayHandler:
                 st.write(violation)
 
     @staticmethod
-    def _check_and_display_images(best_match_row, df, col):
-        camis_value, inspection_date = best_match_row['camis'], best_match_row['inspection_date']
-        matching_rows = df[(df['camis'] == camis_value) & (df['inspection_date'] == inspection_date)]
-        violation_descriptions = matching_rows['violation_description'].str.lower()
-
-        if any("evidence of rats" in description for description in violation_descriptions):
+    def _check_and_display_images(best_match_row, col):
+        violation_descriptions = best_match_row['violation_description'].str.lower()
+        if "evidence of rats" in violation_descriptions:
             col.image('https://media.istockphoto.com/id/165655302/vector/rat-cartoon-thumbs-up.jpg?s=612x612&w=0&k=20&c=cHqlmywrwiSuO96Vl7gqGMoULsg2ETwnPqU91-FIg14=', caption='Evidence of Rats')
-        if any("evidence of mice" in description for description in violation_descriptions):
+        if "evidence of mice" in violation_descriptions:
             col.image('https://www.freethink.com/wp-content/uploads/2023/03/mice-with-two-dads-thumb.jpg?w=640', caption='Evidence of Mice')
 
 def main():
@@ -103,7 +93,7 @@ def main():
         if user_input:
             with st.spinner("Fetching data..."):
                 df = load_data('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
-            matcher = Matcher(df)
+            matcher = Matcher(df)  
             best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
                 display_handler = DisplayHandler(best_match_row, df)
