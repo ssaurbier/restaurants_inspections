@@ -10,7 +10,7 @@ class DataLoader:
 
     def load(self):
         response = requests.get(self.url)
-        response.raise_for_status()  # Check if the request was successful
+        #response.raise_for_status()  # check if the req was successful
         data = io.StringIO(response.text)
         df = pd.read_csv(data)
         print(df.columns)
@@ -104,7 +104,8 @@ def main():
             with st.spinner("Fetching data..."):
                 data_loader = DataLoader('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
                 df = data_loader.load()
-                best_match_row = matcher.find_best_match(user_input)
+            matcher = Matcher(df)  
+            best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
                 display_handler = DisplayHandler(best_match_row, df)
                 col = display_handler.display_overview()
