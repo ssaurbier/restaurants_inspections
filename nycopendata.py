@@ -24,11 +24,9 @@ class Matcher:
         self.df = df
 
     def find_best_match(self, user_input):
-        # Use fuzzywuzzy's process.extractOne to find the best match
-        best_match, score = process.extractOne(user_input.lower(), self.df['combined'])
-        if score > 60:  # You can adjust this threshold based on your requirements
-            return self.df[self.df['combined'] == best_match].iloc[0]
-        return None
+        _, _, idx = process.extractOne(user_input.lower(), self.df['combined'])
+        best_match_row = self.df.iloc[idx]
+        return best_match_row
 
 class GradeCalculator:
     @staticmethod
