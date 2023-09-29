@@ -1,8 +1,13 @@
 import streamlit as st
 import pandas as pd
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 import requests
 import io
+
+# Create an additional function to pre-process data.
+def preprocess_data(df):
+    df['combined'] = df.apply(lambda row: ' '.join(row.astype(str).values), axis=1)
+    return df
 
 @st.cache_data
 def load_data(url):
@@ -11,20 +16,19 @@ def load_data(url):
     df = pd.read_csv(data)
     df['dba'] = df['dba'].astype(str)
     df['inspection_date'] = pd.to_datetime(df['inspection_date'])
-    return df.sort_values(by='inspection_date', ascending=False)
+    df = df.sort_values(by='inspection_date', ascending=False)
+    return preprocess_data(df)
 
 class Matcher:
     def __init__(self, df):
         self.df = df
 
     def find_best_match(self, user_input):
-        best_match_row, best_match_score = None, 0
-        for index, row in self.df.iterrows():
-            row_values = ' '.join(row.astype(str).values)
-            match_score = fuzz.partial_ratio(user_input.lower(), row_values.lower())
-            if match_score > best_match_score:
-                best_match_score, best_match_row = match_score, row
-        return best_match_row
+        # Use fuzzywuzzy's process.extractOne to find the best match
+        best_match, score = process.extractOne(user_input.lower(), self.df['combined'])
+        if score > 60:  # You can adjust this threshold based on your requirements
+            return self.df[self.df['combined'] == best_match].iloc[0]
+        return None
 
 class GradeCalculator:
     @staticmethod
@@ -98,7 +102,7 @@ def main():
         if user_input:
             with st.spinner("Fetching data..."):
                 df = load_data('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
-            matcher = Matcher(df)  
+            matcher = Matcher(df)
             best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
                 display_handler = DisplayHandler(best_match_row, df)
