@@ -4,7 +4,7 @@ from fuzzywuzzy import fuzz
 import requests
 import io
 
-@st.cache
+@st.cache_data
 def load_data(url):
     response = requests.get(url)
     data = io.StringIO(response.text)
