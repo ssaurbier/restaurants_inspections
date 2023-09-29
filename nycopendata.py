@@ -102,7 +102,7 @@ def main():
     if search_button:
         if user_input:
             with st.spinner("Fetching data..."):
-                data_loader = DataLoader('https://raw.githubusercontent.com/ssaurbier/restaurants_inspections/main/health_data.csv')
+                data_loader = DataLoader('https://raw.githubusercontent.com/ssaurbier/restaurant_inspections/main/health_data.csv')
                 df = data_loader.load()
                 best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
