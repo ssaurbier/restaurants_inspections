@@ -1,13 +1,18 @@
 import streamlit as st
 import pandas as pd
 from fuzzywuzzy import fuzz
+import requests
+import io
 
 class DataLoader:
-    def __init__(self, file_path):
-        self.file_path = file_path
+    def __init__(self, url):
+        self.url = url
 
     def load(self):
-        df = pd.read_csv(self.file_path)
+        response = requests.get(self.url)
+        response.raise_for_status()  # Check if the request was successful
+        data = io.StringIO(response.text)
+        df = pd.read_csv(data)
         print(df.columns)
         df['dba'] = df['dba'].astype(str)
         df['inspection_date'] = pd.to_datetime(df['inspection_date'])
@@ -93,13 +98,12 @@ def main():
     st.sidebar.markdown("## Search")
     user_input = st.sidebar.text_input("Enter a restaurant name and / or other details:")
     search_button = st.sidebar.button("Search")
-
+    
     if search_button:
         if user_input:
             with st.spinner("Fetching data..."):
-                data_loader = DataLoader('health_data.csv')
+                data_loader = DataLoader('https://raw.githubusercontent.com/your-username/your-repo/master/health_data.csv')
                 df = data_loader.load()
-                matcher = Matcher(df)
                 best_match_row = matcher.find_best_match(user_input)
             if best_match_row is not None:
                 display_handler = DisplayHandler(best_match_row, df)
